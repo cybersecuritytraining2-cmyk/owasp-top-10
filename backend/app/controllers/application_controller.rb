@@ -31,13 +31,18 @@ class ApplicationController < ActionController::API
   end
 
   def user_json(user)
+    primary = Store.primary_account(user)
     {
       id:             user[:id],
       name:           user[:name],
       username:       user[:username],
       role:           user[:role],
-      account_number: user[:account_number],
-      balance:        user[:balance].round(2),
+      account_number: primary[:number],
+      balance:        primary[:balance].round(2),
+      # The customer's own accounts — used to populate the "pay from" dropdown.
+      accounts:       user[:accounts].map do |a|
+        { number: a[:number], label: a[:label], balance: a[:balance].round(2) }
+      end,
       card:           user[:card]
     }
   end

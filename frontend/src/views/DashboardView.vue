@@ -44,7 +44,8 @@ async function load() {
     const { data } = await getMe();
     me.value = data;
     statementAccount.value = data.account_number;
-    payFrom.value = data.account_number; // pay your card from your own account
+    // Default the "pay from" dropdown to the customer's first owned account.
+    payFrom.value = data.accounts?.[0]?.number || data.account_number;
     await loadStatement();
   } catch (e) {
     if (e.response?.status === 401) router.push("/login");
@@ -160,10 +161,18 @@ async function submitPay() {
           <p class="text-sub text-xs">Pay down your card balance from one of your accounts.</p>
           <div>
             <label class="block text-xs text-sub mb-1">Pay from account</label>
-            <input
+            <select
               v-model="payFrom"
               class="w-full bg-ink border border-line rounded-lg px-3 py-2 text-text font-mono focus:border-brand outline-none"
-            />
+            >
+              <option
+                v-for="a in me.accounts"
+                :key="a.number"
+                :value="a.number"
+              >
+                {{ a.label }} · {{ a.number }} ({{ money(a.balance) }})
+              </option>
+            </select>
           </div>
           <div>
             <label class="block text-xs text-sub mb-1">Amount (USD)</label>

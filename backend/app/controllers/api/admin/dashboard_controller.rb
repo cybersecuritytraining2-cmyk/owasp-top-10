@@ -34,13 +34,14 @@ module Api
       def users
         render json: {
           users: Store::USERS.values.map do |u|
+            primary = Store.primary_account(u)
             {
               id:             u[:id],
               name:           u[:name],
               username:       u[:username],
               role:           u[:role],
-              account_number: u[:account_number],
-              balance:        u[:balance].round(2),
+              account_number: primary[:number],
+              balance:        primary[:balance].round(2),
               blocked:        u[:blocked]
             }
           end

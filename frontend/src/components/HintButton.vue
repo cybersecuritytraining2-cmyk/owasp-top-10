@@ -7,7 +7,7 @@ const hints = [
   {
     number: "01",
     title: "Pay your card with someone else's money",
-    body: "On the dashboard, 'Pay your credit card' has a 'Pay from account' field. It's pre-filled with your own account number — but it's just a text box, and the server trusts whatever you send. Watch the POST to /api/cards/pay in your proxy. What if 'from_account' is another customer's number (5021-0002)? Whose balance goes down?",
+    body: "On the dashboard, 'Pay your credit card' lets you pick a 'Pay from account' — but the dropdown only lists accounts you own, so clicking around looks safe. The catch is the constraint lives only in the browser. Intercept the POST to /api/cards/pay in your proxy (Burp/ZAP) and change 'from_account' to another customer's number (5021-0002) before it reaches the server. Does the server re-check that the account is yours? Whose balance drops?",
   },
   {
     number: "02",

@@ -20,8 +20,22 @@ module Store
     USERS[SESSIONS[token]]
   end
 
-  def self.user_by_account(account_number)
-    USERS.values.find { |u| u[:account_number] == account_number }
+  # Every customer owns one or more accounts (checking + savings). The first
+  # account in the list is treated as the primary/checking account.
+  def self.primary_account(user)
+    user[:accounts].first
+  end
+
+  # Find the account hash with the given number across *all* customers, plus the
+  # user that owns it. Returns { user:, account: } or nil. Note that this does
+  # NOT scope the search to any particular customer — callers that care about
+  # ownership must check it themselves.
+  def self.locate_account(number)
+    USERS.values.each do |u|
+      account = u[:accounts].find { |a| a[:number] == number }
+      return { user: u, account: account } if account
+    end
+    nil
   end
 
   def self.transactions_for(account_number)
@@ -54,20 +68,29 @@ module Store
     [
       {
         username: "alice", password: "Spring2024!", name: "Alice Johnson",
-        role: "customer", account_number: "5021-0001",
-        balance: 8_420.55,
+        role: "customer",
+        accounts: [
+          { number: "5021-0001", label: "Checking", balance: 8_420.55 },
+          { number: "5021-0011", label: "Savings",  balance: 12_300.00 }
+        ],
         card: { number: "4716 88•• •••• 2098", limit: 5_000.00, owed: 1_240.30 }
       },
       {
         username: "bob", password: "Hunter2024#", name: "Bob Martinez",
-        role: "customer", account_number: "5021-0002",
-        balance: 15_980.10,
+        role: "customer",
+        accounts: [
+          { number: "5021-0002", label: "Checking", balance: 15_980.10 },
+          { number: "5021-0012", label: "Savings",  balance: 40_000.00 }
+        ],
         card: { number: "5500 41•• •••• 7733", limit: 12_000.00, owed: 4_512.00 }
       },
       {
         username: "carol", password: "Autumn2024$", name: "Carol Nguyen",
-        role: "customer", account_number: "5021-0003",
-        balance: 2_310.75,
+        role: "customer",
+        accounts: [
+          { number: "5021-0003", label: "Checking", balance: 2_310.75 },
+          { number: "5021-0013", label: "Savings",  balance: 5_500.00 }
+        ],
         card: { number: "3782 82•• •••• 1006", limit: 3_000.00, owed: 980.55 }
       },
       # Hidden privileged account. Not advertised anywhere in the customer UI.
@@ -75,8 +98,10 @@ module Store
       # and from the /api/admin/* endpoints.
       {
         username: "admin", password: "V@ultStr33t-0ps!2024", name: "Vault Street Operations",
-        role: "admin", account_number: "5021-0000",
-        balance: 0.00,
+        role: "admin",
+        accounts: [
+          { number: "5021-0000", label: "Operations", balance: 0.00 }
+        ],
         card: nil
       }
     ].each do |u|
@@ -101,6 +126,11 @@ module Store
         ["ATM withdrawal — 5th & Main",       -200.00, 4_467.96],
         ["Credit card payment",               -500.00, 4_667.96]
       ],
+      "5021-0011" => [
+        ["Opening deposit",                  10_000.00, 10_000.00],
+        ["Monthly auto-save",                   300.00, 10_300.00],
+        ["Interest payment",                     45.20, 12_300.00]
+      ],
       "5021-0002" => [
         ["Payroll — Globex Corporation",     6_500.00, 15_980.10],
         ["Apple Store — MacBook Pro",       -2_499.00,  9_480.10],
@@ -109,6 +139,10 @@ module Store
         ["Shell Gas Station",                  -71.20, 13_829.10],
         ["Credit card payment",             -1_000.00, 13_900.30]
       ],
+      "5021-0012" => [
+        ["Opening deposit",                  35_000.00, 35_000.00],
+        ["Bonus — Globex Corporation",        5_000.00, 40_000.00]
+      ],
       "5021-0003" => [
         ["Payroll — Initech",                3_100.00, 2_310.75],
         ["Transfer from 5021-0001 (Alice)",    150.00, 2_460.75],
@@ -116,6 +150,10 @@ module Store
         ["Electric — PG&E",                   -118.40, 2_452.93],
         ["Netflix",                            -22.99, 2_571.33],
         ["Credit card payment",               -300.00, 2_594.32]
+      ],
+      "5021-0013" => [
+        ["Opening deposit",                   5_000.00, 5_000.00],
+        ["Monthly auto-save",                   500.00, 5_500.00]
       ]
     }
 

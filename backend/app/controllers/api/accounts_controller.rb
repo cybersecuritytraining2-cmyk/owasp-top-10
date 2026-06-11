@@ -19,12 +19,12 @@ module Api
     # sequential, so they are trivial to enumerate.
     def transactions
       account_number = params[:account_number]
-      account = Store.user_by_account(account_number)
-      return render json: { error: "Account not found" }, status: :not_found unless account
+      found = Store.locate_account(account_number)
+      return render json: { error: "Account not found" }, status: :not_found unless found
 
       render json: {
         account_number: account_number,
-        holder:         account[:name],
+        holder:         found[:user][:name],
         transactions:   Store.transactions_for(account_number)
       }
     end

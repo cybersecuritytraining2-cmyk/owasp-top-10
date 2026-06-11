@@ -83,11 +83,15 @@ behave very differently from injection flaws under tooling — pay attention to
 which methods work and which don't.
 
 ### 1. Manual testing (in the browser + an intercepting proxy)
-The dashboard exposes the flaws directly:
-- The **“Pay from account”** box and the **statement account** box are editable
-  text fields. Change them.
-- Put **Burp Suite** or **OWASP ZAP** in front of the browser and inspect the
-  requests to `/api/cards/pay` and `/api/accounts/<n>/transactions`. The account
+The dashboard exposes the flaws — but not all of them are obvious by clicking:
+- The **“Pay from account”** control is a **dropdown that only lists accounts you
+  own**, so the UI looks safe. The ownership rule is enforced only in the browser.
+  Put **Burp Suite** or **OWASP ZAP** in front of the browser, intercept the
+  `POST /api/cards/pay`, and rewrite `from_account` to another customer's number
+  before it reaches the server. This is the more realistic class of bug: the
+  client constrains the input, the server forgets to.
+- The **statement account** box is an editable text field — change it. Either way,
+  inspect the requests to `/api/accounts/<n>/transactions` in your proxy. Account
   numbers are short and sequential (`5021-0001`, `5021-0002`, …) — trivial to
   enumerate.
 
@@ -151,8 +155,12 @@ owasp-top-10-a01/
 <summary><strong>⚠️ Spoilers — full solution & walk-through (open only when you're done)</strong></summary>
 
 ### Vulnerability 1 — Pay your card from someone else's account
-`POST /api/cards/pay` reads the **funding account from the request body**
-(`from_account`) and debits it without checking it belongs to the caller.
+The UI renders the funding account as a **dropdown that only lists accounts the
+signed-in customer owns** (checking + savings), so the bug isn't visible by
+clicking. But `POST /api/cards/pay` reads the **funding account from the request
+body** (`from_account`) and debits it without checking it belongs to the caller —
+the client-side constraint is never re-enforced server-side. Intercept the
+request (or just replay it with `curl`) and swap in another customer's number:
 
 ```bash
 TOKEN=... # Alice's bearer token from the login response
@@ -161,8 +169,9 @@ curl -X POST http://localhost:3000/api/cards/pay \
   -d '{"from_account":"5021-0002","amount":1000}'
 ```
 Alice's card balance drops while **Bob's** balance is debited. *Fix:* force the
-funding account to `current_user[:account_number]`, exactly like
-`transfers#create`.
+funding account server-side to one of `current_user`'s own accounts (reject any
+`from_account` not in `current_user[:accounts]`), the same way `transfers#create`
+scopes the source to `current_user`.
 
 ### Vulnerability 2 — Read anyone's statement (IDOR)
 `GET /api/accounts/:account_number/transactions` looks up transactions straight
