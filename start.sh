@@ -75,7 +75,7 @@ ok "Backend running  →  http://localhost:3000"
 # ── Start frontend ────────────────────────────────────────────────────────────
 info "Starting Vue frontend…"
 cd "$SCRIPT_DIR/frontend"
-npm run dev -- --port 5173 --host 0.0.0.0 2>&1 \
+npm run dev -- --port 5173 --strictPort --host 0.0.0.0 2>&1 \
   | grep --line-buffered -v "^$" &
 FRONTEND_PID=$!
 
