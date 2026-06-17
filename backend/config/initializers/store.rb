@@ -184,6 +184,16 @@ module Store
     log("INFO  ops  — nightly backup uploaded s3://vaultstreet-backups/db-2024.sql.gz")
     log("DEBUG cfg  — internal admin api key ADMIN_API_KEY=vs_live_4e7b91d0c2a8 (rotate before prod)")
   end
+
+  # Statement exports are written to disk (tmp/exports). The in-memory data above
+  # resets on restart on its own, but files on disk would survive — so wipe any
+  # leftover exports at boot to keep a restart a truly clean slate.
+  def self.clear_exports!
+    dir = Rails.root.join("tmp", "exports")
+    FileUtils.rm_f(Dir.glob(dir.join("*.csv"))) if Dir.exist?(dir)
+  end
 end
 
+require "fileutils"
+Store.clear_exports!
 Store.seed!
