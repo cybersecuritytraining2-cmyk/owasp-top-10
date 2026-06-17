@@ -198,7 +198,7 @@ A01 or insecure design; those bugs are found by humans and by DAST.
 ## Project layout
 
 ```
-owasp-top-10-a01/
+owasp-top-10/
 ├── backend/                 # Rails 8 API-only app (in-memory store, no DB)
 │   ├── app/controllers/
 │   │   ├── application_controller.rb     # auth helpers (authenticate_user!, require_admin!)
