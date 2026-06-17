@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { RouterView, RouterLink, useRouter, useRoute } from "vue-router";
 import HintButton from "@/components/HintButton.vue";
 import { logout as apiLogout } from "@/services/api.js";
@@ -13,7 +13,13 @@ router.afterEach(() => {
   name.value = localStorage.getItem("vs_name") || "";
 });
 
-const authed = () => !!localStorage.getItem("vs_token");
+// Touch `route.path` so this recomputes on every navigation (login token lives in
+// localStorage, which isn't reactive on its own). Without this, the header never
+// re-renders after login and the Sign out button stays hidden until a refresh.
+const authed = computed(() => {
+  route.path;
+  return !!localStorage.getItem("vs_token");
+});
 
 async function logout() {
   try {
@@ -39,7 +45,7 @@ async function logout() {
           </span>
         </RouterLink>
 
-        <nav v-if="authed() && route.path !== '/login'" class="flex items-center gap-5 text-sm">
+        <nav v-if="authed && route.path !== '/login'" class="flex items-center gap-5 text-sm">
           <RouterLink to="/dashboard" class="text-sub hover:text-text transition">Dashboard</RouterLink>
           <span class="text-sub/60 hidden sm:inline">{{ name }}</span>
           <button
