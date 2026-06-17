@@ -11,8 +11,8 @@ warn() { echo -e "${YELLOW}  !${NC}  $*"; }
 die()  { echo -e "${RED}  ✘  $*${NC}"; exit 1; }
 
 echo
-echo -e "${BOLD}Vault Street Bank — OWASP A01 Exercise Installer${NC}"
-echo -e "A01: Broken Access Control"
+echo -e "${BOLD}Vault Street Bank — OWASP Top 10 Exercise Installer${NC}"
+echo -e "A deliberately vulnerable banking app"
 echo "────────────────────────────────────────"
 
 # ── 1. Prerequisites ─────────────────────────────────────────────────────────

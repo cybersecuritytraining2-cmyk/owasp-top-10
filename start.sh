@@ -51,8 +51,8 @@ done
 rm -f "$SCRIPT_DIR/backend/tmp/pids/server.pid"
 
 echo
-echo -e "${BOLD}Vault Street Bank — OWASP A01 Exercise${NC}"
-echo -e "A01: Broken Access Control"
+echo -e "${BOLD}Vault Street Bank — OWASP Top 10 Exercise${NC}"
+echo -e "A deliberately vulnerable banking app"
 echo "────────────────────────────────────────"
 
 # ── Start backend ─────────────────────────────────────────────────────────────
