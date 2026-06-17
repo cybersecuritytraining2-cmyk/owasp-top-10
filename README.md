@@ -1,9 +1,19 @@
-# Vault Street Bank — OWASP A01: Broken Access Control
+# Vault Street Bank — OWASP A01: Broken Access Control (+ Injection & Mass Assignment)
 
 A deliberately vulnerable online-banking application built to teach **OWASP Top 10
 A01:2021 — Broken Access Control**. You will log in as an ordinary customer and
 use the application's own features to access money and data that should never be
 yours.
+
+It also carries two further, deliberately planted server-side flaws on the
+**“Open a new account”** feature so you can contrast bug classes under tooling:
+
+- **Server-Side Template Injection (SSTI → RCE)** — A03:2021 Injection.
+- **Mass Assignment** — A08:2021 Software & Data Integrity Failures / the OWASP
+  API Top 10 *Broken Object Property Level Authorization*.
+
+The contrast is the point: the access-control flaws are invisible to a SAST scan,
+while the injection and mass-assignment flaws light it up.
 
 > ⚠️ **Training use only.** This app ships with intentional vulnerabilities, weak
 > secrets, and seeded personal data. Never deploy it anywhere reachable from the
@@ -20,6 +30,8 @@ customer can:
 - View their **statement** (transaction history).
 - **Transfer money** to another customer by account number.
 - **Pay down their credit card** from one of their accounts.
+- **Open a new account** by giving it a nickname (it opens with a $0.00 balance
+  and shows a personalized welcome banner).
 
 There are three demo customers. Their credentials are shown right on the login
 screen:
@@ -54,9 +66,11 @@ get stuck.
 
 ## Your objectives
 
-This exercise is entirely about **access control** — the app authenticates you
-fine, but it is sloppy about checking *what you are allowed to do* once you are in.
-Sign in as **Alice** and try to achieve each of the following:
+The core of this exercise is **access control** — the app authenticates you fine,
+but it is sloppy about checking *what you are allowed to do* once you are in. Two
+bonus objectives (4 and 5) cover injection and mass assignment on the new
+**“Open a new account”** feature. Sign in as **Alice** and try to achieve each of
+the following:
 
 1. **Pay off your own credit card using another customer's money.**
    You should only be able to draw from *your* accounts. Can you make Bob pay
@@ -70,6 +84,17 @@ Sign in as **Alice** and try to achieve each of the following:
    The app writes operational logs that were never meant for customers. They
    exist somewhere in the system — find a way to read them, and notice what they
    leak.
+
+4. **Run code on the banking server.** *(Injection — SSTI)*
+   The “Open a new account” feature greets you by the **nickname** you choose.
+   That greeting is built from a server-side template. What happens if your
+   nickname *is* a template expression? Start with `<%= 7*7 %>` and escalate.
+
+5. **Open an account that isn't empty.** *(Mass Assignment)*
+   New accounts are supposed to start at $0.00 — the form only lets you set a
+   nickname. But the server builds the account from whatever the request body
+   contains. Can you make it accept a starting **balance** the form never asked
+   for?
 
 For each one, figure out **what the correct check would have been** and where it
 is missing.
@@ -105,12 +130,25 @@ exploitable. Compare `cards_controller.rb` (vulnerable) with
 ```bash
 cd backend && bin/brakeman
 ```
-**Brakeman reports zero warnings — and that is the lesson.** Static analysers
-detect dangerous *sinks* (SQL strings, `eval`, file paths, `html_safe`). Broken
-access control has no sink: the code is "safe" line-by-line and only wrong
-relative to *who should be allowed to run it*. A clean SAST report does **not**
-mean an app is free of A01. These bugs are found by humans and by DAST, not by
-pattern-matching static analysis.
+**Brakeman finds the injection and the mass assignment — and is blind to all
+three access-control bugs. That split is the lesson.** It reports exactly two
+warnings:
+
+| Brakeman finding | Confidence | This exercise |
+|------------------|-----------|---------------|
+| `Template Injection` — value used directly in `ERB` | High | **Vuln 5 (SSTI)** |
+| `Mass Assignment` — `permit!` allows any keys        | Medium | **Vuln 4 (Mass Assignment)** |
+
+Static analysers detect dangerous *sinks* (template eval, `permit!`, SQL strings,
+`eval`, file paths). Both bonus bugs have a sink, so Brakeman nails them. But the
+three **broken-access-control** flaws (vulns 1–3) have **no sink**: the code is
+"safe" line-by-line and only wrong relative to *who should be allowed to run it*.
+Brakeman says nothing about them. A clean — or even a non-empty — SAST report
+tells you nothing about A01; those bugs are found by humans and by DAST.
+
+> Note: `bin/brakeman` is wired with `--ensure-latest`, so it refuses to run
+> unless you are on the newest Brakeman release. If it just prints a version
+> notice and exits, run `cd backend && bundle exec brakeman` instead.
 
 ### 4. DAST / fuzzing
 - **Authorization testing**: with Burp/ZAP, capture a request as Alice, then
@@ -136,6 +174,7 @@ owasp-top-10-a01/
 │   │   └── api/
 │   │       ├── sessions_controller.rb    # login / logout
 │   │       ├── accounts_controller.rb    # /me, statement   ← VULNERABILITY 2
+│   │       │                             # open account     ← VULNERABILITIES 4 & 5
 │   │       ├── transfers_controller.rb   # money transfer   (secure reference)
 │   │       ├── cards_controller.rb       # card payment     ← VULNERABILITY 1
 │   │       └── admin/dashboard_controller.rb                ← VULNERABILITY 3
@@ -226,10 +265,54 @@ authorization lets a customer **block other users** via
 *Fix:* add `before_action :require_admin!` to the admin controller (the helper
 already exists in `ApplicationController` — it is simply never wired up).
 
+### Vulnerability 4 — Open an account with a smuggled balance (Mass Assignment)
+`POST /api/accounts` builds the new account by mass-assigning the **entire request
+body** (`params.permit!`). The form only sends `label`, and new accounts are meant
+to start at $0.00 — but the server never restricts the accepted keys, so any
+attribute you add is copied straight onto the account.
+
+```bash
+curl -X POST http://localhost:3000/api/accounts \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"label":"Slush","balance":250000}'
+```
+The response — and your account dropdown after a refresh — show a brand-new
+account pre-loaded with $250,000 that was never deposited. (`number` can be
+smuggled the same way.) *Fix:* permit only `:label`
+(`params.require(:account).permit(:label)` or an explicit allow-list) and set the
+balance and account number on the server.
+
+### Vulnerability 5 — Run code on the server (SSTI → RCE)
+The same endpoint builds a welcome banner by interpolating your nickname into an
+**ERB template string** and evaluating it server-side
+(`ERB.new("…#{label}…").result`). The nickname lands inside the template *before*
+ERB compiles it, so ERB tags in the nickname execute.
+
+```bash
+# Arithmetic — proves the expression is evaluated:
+curl -X POST http://localhost:3000/api/accounts \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"label":"<%= 7*7 %>"}'
+#  → "welcome":"Welcome to your new 49 account, …"
+
+# Remote code execution:
+curl -X POST http://localhost:3000/api/accounts \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"label":"<%= `id` %>"}'
+#  → "welcome":"Welcome to your new uid=1000(…) … account, …"
+```
+You can also trigger it straight from the dashboard: type `<%= 7*7 %>` into the
+**“Open a new account”** nickname field and watch the banner render `49`. *Fix:*
+never compile user input as a template — pass the nickname as plain data (ordinary
+string interpolation in the JSON response, not ERB).
+
 ### The underlying theme
-All three bugs are the same mistake in three costumes: **the server authenticates
-the user but trusts the client for authorization.** The correct fix is always to
-derive identity/authority from the *session* (`current_user`) on the server, and
-to check it on *every* sensitive action.
+The three access-control bugs are the same mistake in three costumes: **the server
+authenticates the user but trusts the client for authorization.** The correct fix
+is always to derive identity/authority from the *session* (`current_user`) on the
+server, and to check it on *every* sensitive action. The two bonus bugs add a
+second theme: **never trust the shape or content of the request body** — allow-list
+the fields you accept (vuln 4) and treat user input as data, never as code
+(vuln 5).
 
 </details>

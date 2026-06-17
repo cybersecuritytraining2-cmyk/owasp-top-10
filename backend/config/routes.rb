@@ -9,6 +9,9 @@ Rails.application.routes.draw do
     # The signed-in customer's own dashboard (profile, balance, card)
     get "me", to: "accounts#me"
 
+    # Open a new account (savings, vacation fund, …) for the signed-in customer
+    post "accounts", to: "accounts#create"
+
     # Transaction history for an account
     get "accounts/:account_number/transactions", to: "accounts#transactions"
 

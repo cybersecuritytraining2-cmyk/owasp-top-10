@@ -9,11 +9,17 @@ module Store
   TRANSACTIONS = []   # flat list of ledger entries (one per account movement)
   LOGS         = []   # application log lines (login events, admin actions, …)
 
-  USER_COUNTER = [0]
-  TXN_COUNTER  = [0]
+  USER_COUNTER    = [0]
+  TXN_COUNTER     = [0]
+  ACCOUNT_COUNTER = [1000]   # customer-opened accounts get numbers from 5021-1001 up
 
   def self.next_user_id = USER_COUNTER[0] += 1
   def self.next_txn_id  = TXN_COUNTER[0]  += 1
+
+  def self.next_account_number
+    ACCOUNT_COUNTER[0] += 1
+    format("5021-%04d", ACCOUNT_COUNTER[0])
+  end
 
   # ── Lookups ──────────────────────────────────────────────────────────────────
   def self.user_by_token(token)

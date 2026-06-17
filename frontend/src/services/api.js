@@ -21,6 +21,8 @@ export const getMe = () => http.get("/me");
 export const getTransactions = (accountNumber) =>
   http.get(`/accounts/${accountNumber}/transactions`);
 
+export const openAccount = (label) => http.post("/accounts", { label });
+
 export const transfer = (toAccount, amount) =>
   http.post("/transfers", { to_account: toAccount, amount });
 

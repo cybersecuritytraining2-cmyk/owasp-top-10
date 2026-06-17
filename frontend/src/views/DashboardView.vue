@@ -6,6 +6,7 @@ import {
   getTransactions,
   transfer,
   payCard,
+  openAccount,
 } from "@/services/api.js";
 
 const router = useRouter();
@@ -28,6 +29,12 @@ const payFrom = ref("");
 const payAmount = ref("");
 const payMsg = ref("");
 const payErr = ref("");
+
+// open-new-account form
+const newAccountLabel = ref("");
+const openMsg = ref("");
+const openWelcome = ref("");
+const openErr = ref("");
 
 const money = (n) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
@@ -86,6 +93,19 @@ async function submitPay() {
     await load();
   } catch (e) {
     payErr.value = e.response?.data?.error || "Payment failed.";
+  }
+}
+
+async function submitOpenAccount() {
+  openMsg.value = openErr.value = openWelcome.value = "";
+  try {
+    const { data } = await openAccount(newAccountLabel.value.trim());
+    openMsg.value = `Opened ${data.account.label} (${data.account.number}) · ${money(data.account.balance)}.`;
+    openWelcome.value = data.welcome;
+    newAccountLabel.value = "";
+    await load();
+  } catch (e) {
+    openErr.value = e.response?.data?.error || "Could not open account.";
   }
 }
 </script>
@@ -192,6 +212,33 @@ async function submitPay() {
           <p v-if="payErr" class="text-neg text-sm">{{ payErr }}</p>
         </form>
       </div>
+
+      <!-- Open a new account -->
+      <form @submit.prevent="submitOpenAccount" class="bg-card border border-line rounded-2xl p-6 space-y-3">
+        <h2 class="text-text font-semibold">Open a new account</h2>
+        <p class="text-sub text-xs">
+          Give your new account a nickname. It opens instantly with a $0.00 balance
+          and a personalized welcome.
+        </p>
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="flex-1 min-w-[12rem]">
+            <label class="block text-xs text-sub mb-1">Account nickname</label>
+            <input
+              v-model="newAccountLabel"
+              placeholder="Vacation Fund"
+              class="w-full bg-ink border border-line rounded-lg px-3 py-2 text-text focus:border-brand outline-none"
+            />
+          </div>
+          <button class="bg-brand hover:bg-brand-dark text-white font-semibold px-5 py-2.5 rounded-lg transition">
+            Open account
+          </button>
+        </div>
+        <p v-if="openWelcome" class="text-text text-sm bg-brand/10 border border-brand/30 rounded-lg px-3 py-2">
+          {{ openWelcome }}
+        </p>
+        <p v-if="openMsg" class="text-pos text-sm">{{ openMsg }}</p>
+        <p v-if="openErr" class="text-neg text-sm">{{ openErr }}</p>
+      </form>
 
       <!-- Statement -->
       <div class="bg-card border border-line rounded-2xl p-6">
