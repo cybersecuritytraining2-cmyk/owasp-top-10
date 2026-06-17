@@ -16,3 +16,7 @@ backend/vendor/bundle/
 .DS_Store
 .env
 .env.*
+
+# ── Editor / tooling ──────────────────────────────────────────────────────
+.vscode/
+.idea/
